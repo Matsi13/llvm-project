@@ -66,6 +66,7 @@
 /*============================================================================*/
 
 #include "mlir/Conversion/MemrefAllocToGPU/MemrefAllocToGPU.h"
+#include "mlir/Conversion/MemrefDeallocToGPU/MemrefDeallocToGPU.h"
 
 namespace mlir {
 

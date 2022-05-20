@@ -55,3 +55,4 @@ add_subdirectory(VectorToSPIRV)
 # /*============================================================================*/
 
 add_subdirectory(MemrefAllocToGPU)
+add_subdirectory(MemrefDeallocToGPU)

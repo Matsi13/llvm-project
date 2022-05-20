@@ -960,4 +960,14 @@ def ConvertMemrefAllocToGPU
   let dependentDialects = ["gpu::GPUDialect"];
     }
 
+/*============================================================================*/
+/*                     lijx: MemrefDealloc to GPUDealloc                      */
+/*============================================================================*/
+def ConvertMemrefDeallocToGPU
+    : Pass<"convert-memref-dealloc-to-gpu"> {
+  let summary = "Convert memref.dealloc outside gpu.launch to gpu.alloc";
+  let constructor = "mlir::createConvertMemrefDeallocToGPUPass()";
+  let dependentDialects = ["gpu::GPUDialect"];
+    }
+
 #endif // MLIR_CONVERSION_PASSES
