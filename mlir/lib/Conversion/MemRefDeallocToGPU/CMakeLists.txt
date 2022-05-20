@@ -1,5 +1,5 @@
 add_mlir_conversion_library(MemRefDeallocToGPU
-  MemrefDeallocToGPU.cpp
+  MemRefDeallocToGPU.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${MLIR_MAIN_INCLUDE_DIR}/mlir/Conversion/MemRefDeallocToGPU

@@ -65,8 +65,14 @@
 /*                        lijx: MemrefAlloc to GPUAlloc                       */
 /*============================================================================*/
 
-#include "mlir/Conversion/MemrefAllocToGPU/MemrefAllocToGPU.h"
-#include "mlir/Conversion/MemrefDeallocToGPU/MemrefDeallocToGPU.h"
+#include "mlir/Conversion/MemRefAllocToGPU/MemRefAllocToGPU.h"
+#include "mlir/Conversion/MemRefDeallocToGPU/MemRefDeallocToGPU.h"
+
+/*============================================================================*/
+/*                      lijx: MemrefAlloca to MemrefAlloc                     */
+/*============================================================================*/
+
+#include "mlir/Conversion/MemRefAllocaToAlloc/MemRefAllocaToAlloc.h"
 
 namespace mlir {
 

@@ -54,5 +54,11 @@ add_subdirectory(VectorToSPIRV)
 # /*                        lijx: MemrefAlloc to GPUAlloc                       */
 # /*============================================================================*/
 
-add_subdirectory(MemrefAllocToGPU)
-add_subdirectory(MemrefDeallocToGPU)
+add_subdirectory(MemRefAllocToGPU)
+add_subdirectory(MemRefDeallocToGPU)
+
+# /*============================================================================*/
+# /*                     lijx: MemrefAlloca to MemrefAlloc                      */
+# /*============================================================================*/
+
+add_subdirectory(MemRefAllocaToAlloc)

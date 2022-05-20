@@ -6,15 +6,14 @@
 
 namespace mlir {
 class Pass;
-// class LLVMTypeConverter;
+
 class RewritePatternSet;
 class MLIRContext;
 
-/// Collect a set of patterns to convert memory-related operations from the
-/// MemRef dialect to the LLVM dialect.
+
 void populateMemRefDeallocToGPUConversionPatterns(RewritePatternSet &patterns);
 
-std::unique_ptr<Pass> createConvertMemrefDeallocToGPUPass();
+std::unique_ptr<Pass> createConvertMemRefDeallocToGPUPass();
 } // namespace mlir
 
-#endif // MLIR_CONVERSION_MEMREFTOLLVM_MEMREFTOLLVM_H
+#endif 

@@ -3,7 +3,7 @@
 #include "../PassDetail.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Analysis/DataLayoutAnalysis.h"
-#include "mlir/Conversion/MemrefDeallocToGPU/MemrefDeallocToGPU.h"
+#include "mlir/Conversion/MemRefAllocToGPU/MemRefAllocToGPU.h"
 
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -32,40 +32,40 @@
 using namespace mlir;
 
 namespace {
-class MemrefDeallocToGPUPattern
-    : public OpRewritePattern<memref::DeallocOp> {
+class MemRefAllocToGPUPattern
+    : public OpRewritePattern<memref::AllocOp> {
   public:
-  using OpRewritePattern<memref::DeallocOp>::OpRewritePattern;
+  using OpRewritePattern<memref::AllocOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(memref::DeallocOp op,
+  LogicalResult matchAndRewrite(memref::AllocOp op,
                                 PatternRewriter &rewriter) const override {
-    memref::DeallocOpAdaptor operandAdaptor = memref::DeallocOpAdaptor(op);
+    memref::AllocOpAdaptor operandAdaptor = memref::AllocOpAdaptor(op);
     Operation* baseop(op);
-    auto deallocOp = cast<memref::DeallocOp>(op);
+    auto allocOp = cast<memref::AllocOp>(op);
     // auto launchOp = op.getParentOfType<gpu::LaunchOp>();
     if (!baseop->getParentOfType<gpu::LaunchOp>())
     {
        ValueRange voidValue = {};
-       rewriter.replaceOpWithNewOp<gpu::DeallocOp>(op, Type(), ValueRange(),operandAdaptor.memref());
+       rewriter.replaceOpWithNewOp<gpu::AllocOp>(op,allocOp.memref().getType(), Type(),voidValue,operandAdaptor.dynamicSizes(),operandAdaptor.symbolOperands());
     }
     return success();
   }
 };   
 }
 
-void mlir::populateMemRefDeallocToGPUConversionPatterns(RewritePatternSet &patterns){
-    patterns.add<MemrefDeallocToGPUPattern>(patterns.getContext());
+void mlir::populateMemRefAllocToGPUConversionPatterns(RewritePatternSet &patterns){
+    patterns.add<MemRefAllocToGPUPattern>(patterns.getContext());
 }
 
 namespace {
 
-class ConvertMemrefDeallocToGPUPass
-    : public ConvertMemrefDeallocToGPUBase<ConvertMemrefDeallocToGPUPass> {
+class ConvertMemRefAllocToGPUPass
+    : public ConvertMemRefAllocToGPUBase<ConvertMemRefAllocToGPUPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    populateMemRefDeallocToGPUConversionPatterns(patterns);
+    populateMemRefAllocToGPUConversionPatterns(patterns);
     ConversionTarget target(getContext());
-    target.addDynamicallyLegalOp<memref::DeallocOp>([](memref::DeallocOp op){
+    target.addDynamicallyLegalOp<memref::AllocOp>([](memref:: AllocOp op){
       Operation *baseop(op);
         if (baseop->getParentOfType<gpu::LaunchOp>())
         {
@@ -73,7 +73,7 @@ class ConvertMemrefDeallocToGPUPass
         }
         return false;
     });
-    target.addLegalOp<gpu::DeallocOp>();
+    target.addLegalOp<gpu::AllocOp>();
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns))))
       signalPassFailure();
@@ -82,6 +82,6 @@ class ConvertMemrefDeallocToGPUPass
 
 } // namespace
 
-std::unique_ptr<Pass> mlir::createConvertMemrefDeallocToGPUPass() {
-  return std::make_unique<ConvertMemrefDeallocToGPUPass>();
+std::unique_ptr<Pass> mlir::createConvertMemRefAllocToGPUPass() {
+  return std::make_unique<ConvertMemRefAllocToGPUPass>();
 }

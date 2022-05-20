@@ -953,21 +953,30 @@ def ConvertVectorToSPIRV : Pass<"convert-vector-to-spirv", "ModuleOp"> {
 /*============================================================================*/
 /*                        lijx: MemrefAlloc to GPUAlloc                       */
 /*============================================================================*/
-def ConvertMemrefAllocToGPU
+def ConvertMemRefAllocToGPU
     : Pass<"convert-memref-alloc-to-gpu"> {
   let summary = "Convert memref.alloc outside gpu.launch to gpu.alloc";
-  let constructor = "mlir::createConvertMemrefAllocToGPUPass()";
+  let constructor = "mlir::createConvertMemRefAllocToGPUPass()";
   let dependentDialects = ["gpu::GPUDialect"];
     }
 
 /*============================================================================*/
 /*                     lijx: MemrefDealloc to GPUDealloc                      */
 /*============================================================================*/
-def ConvertMemrefDeallocToGPU
+def ConvertMemRefDeallocToGPU
     : Pass<"convert-memref-dealloc-to-gpu"> {
   let summary = "Convert memref.dealloc outside gpu.launch to gpu.alloc";
-  let constructor = "mlir::createConvertMemrefDeallocToGPUPass()";
+  let constructor = "mlir::createConvertMemRefDeallocToGPUPass()";
   let dependentDialects = ["gpu::GPUDialect"];
+    }
+/*============================================================================*/
+/*                      lijx: MemrefAlloca to MemrefAlloc                     */
+/*============================================================================*/
+def ConvertMemRefAllocaToAlloc
+    : Pass<"convert-memref-alloca-to-alloc"> {
+  let summary = "Convert memref.alloca to memref.alloc";
+  let constructor = "mlir::createConvertMemRefAllocaToAllocPass()";
+  let dependentDialects = ["memref::MemRefDialect"];
     }
 
 #endif // MLIR_CONVERSION_PASSES
