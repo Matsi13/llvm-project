@@ -932,4 +932,14 @@ def ConvertVectorToSPIRV : Pass<"convert-vector-to-spirv", "ModuleOp"> {
   let dependentDialects = ["spirv::SPIRVDialect"];
 }
 
+/*============================================================================*/
+/*                        lijx: MemrefAlloc to GPUAlloc                       */
+/*============================================================================*/
+def ConvertMemrefAllocToGPU
+    : Pass<"convert-memref-alloc-to-gpu"> {
+  let summary = "Convert memref.alloc outside gpu.launch to gpu.alloc";
+  let constructor = "mlir::createConvertMemrefAllocToGPUPass()";
+  let dependentDialects = ["gpu::GPUDialect"];
+    }
+
 #endif // MLIR_CONVERSION_PASSES
