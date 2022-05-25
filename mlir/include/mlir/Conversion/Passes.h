@@ -74,6 +74,12 @@
 
 #include "mlir/Conversion/MemRefAllocaToAlloc/MemRefAllocaToAlloc.h"
 
+/*============================================================================*/
+/*                    lijx: host_register memref.getglobal                    */
+/*============================================================================*/
+
+// #include "mlir/Conversion/GetGlobalToHost/GetGlobalToHost.h"
+
 namespace mlir {
 
 /// Generate the code for registering conversion passes.

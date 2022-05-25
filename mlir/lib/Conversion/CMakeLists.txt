@@ -62,3 +62,10 @@ add_subdirectory(MemRefDeallocToGPU)
 # /*============================================================================*/
 
 add_subdirectory(MemRefAllocaToAlloc)
+
+
+# /*============================================================================*/
+# /*                  lijx: register memref.get_global to host                  */
+# /*============================================================================*/
+
+# add_subdirectory(GetGlobalToHost)

@@ -9,6 +9,7 @@
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
@@ -65,13 +66,22 @@ class ConvertMemRefAllocToGPUPass
     RewritePatternSet patterns(&getContext());
     populateMemRefAllocToGPUConversionPatterns(patterns);
     ConversionTarget target(getContext());
-    target.addDynamicallyLegalOp<memref::AllocOp>([](memref:: AllocOp op){
-      Operation *baseop(op);
-        if (baseop->getParentOfType<gpu::LaunchOp>())
-        {
-            return true;
+    target.addDynamicallyLegalOp<memref::AllocOp>([](memref::AllocOp op){
+      memref::AllocOp allocOp = cast<memref::AllocOp>(op);
+      Operation *baseOp(op);
+      if (baseOp->getParentOfType<gpu::LaunchOp>()) return true;
+      bool legal = false;
+      func::FuncOp funcOp = baseOp->getParentOfType<func::FuncOp>();
+        for (auto returnOp : funcOp.getBody().getOps<func::ReturnOp>()){
+          func::ReturnOp returnOpBase = cast<func::ReturnOp>(returnOp);
+          func::ReturnOpAdaptor returnOpAdaptor(returnOpBase);
+          for (auto result : returnOpAdaptor.getOperands()){
+              if (result == allocOp.memref()) {
+                legal = true; break;
+              }
+          }
         }
-        return false;
+        return legal;
     });
     target.addLegalOp<gpu::AllocOp>();
     if (failed(applyPartialConversion(getOperation(), target,

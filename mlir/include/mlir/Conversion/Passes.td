@@ -979,4 +979,14 @@ def ConvertMemRefAllocaToAlloc
   let dependentDialects = ["memref::MemRefDialect"];
     }
 
+/*============================================================================*/
+/*                      lijx: MemrefAlloca to MemrefAlloc                     */
+/*============================================================================*/
+// def ConvertGetGlobalToHost
+//     : Pass<"convert-getglobal-to-host"> {
+//   let summary = "register memref.getglobal to host";
+//   let constructor = "mlir::createConvertGetGlobalToHostPass()";
+//   let dependentDialects = ["memref::MemRefDialect", "gpu::GPUDialect"];
+//     }
+
 #endif // MLIR_CONVERSION_PASSES

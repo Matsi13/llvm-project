@@ -1,8 +1,8 @@
-add_mlir_conversion_library(MemRefAllocToGPU
-  MemRefAllocToGPU.cpp
+add_mlir_conversion_library(GetGlobalToHost
+  GetGlobalToHost.cpp
 
   ADDITIONAL_HEADER_DIRS
-  ${MLIR_MAIN_INCLUDE_DIR}/mlir/Conversion/MemRefAllocToGPU
+  ${MLIR_MAIN_INCLUDE_DIR}/mlir/Conversion/GetGlobalToHost
 
   DEPENDS
   MLIRConversionPassIncGen
@@ -21,4 +21,5 @@ add_mlir_conversion_library(MemRefAllocToGPU
   MLIRSupport
   MLIRIR
   MLIRFunc
+
   )
