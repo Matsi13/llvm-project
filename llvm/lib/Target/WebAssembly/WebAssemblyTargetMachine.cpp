@@ -87,7 +87,7 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeWebAssemblyTarget() {
 
 static Reloc::Model getEffectiveRelocModel(Optional<Reloc::Model> RM,
                                            const Triple &TT) {
-  if (!RM.hasValue()) {
+  if (!RM) {
     // Default to static relocation model.  This should always be more optimial
     // than PIC since the static linker can determine all global addresses and
     // assume direct function calls.
@@ -203,11 +203,12 @@ public:
     bool StrippedAtomics = false;
     bool StrippedTLS = false;
 
-    if (!Features[WebAssembly::FeatureAtomics])
+    if (!Features[WebAssembly::FeatureAtomics]) {
       StrippedAtomics = stripAtomics(M);
-
-    if (!Features[WebAssembly::FeatureBulkMemory])
       StrippedTLS = stripThreadLocals(M);
+    } else if (!Features[WebAssembly::FeatureBulkMemory]) {
+      StrippedTLS |= stripThreadLocals(M);
+    }
 
     if (StrippedAtomics && !StrippedTLS)
       stripThreadLocals(M);

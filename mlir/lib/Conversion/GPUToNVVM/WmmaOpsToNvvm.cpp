@@ -13,7 +13,7 @@
 
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
-#include "mlir/Dialect/GPU/GPUDialect.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/LLVMIR/NVVMDialect.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -260,8 +260,7 @@ struct WmmaConstantOpToNVVMLowering
       Value vecCst = rewriter.create<LLVM::UndefOp>(loc, vecType);
       for (int64_t vecEl = 0; vecEl < vecType.getNumElements(); vecEl++) {
         Value idx = rewriter.create<LLVM::ConstantOp>(
-            loc, typeConverter->convertType(rewriter.getIntegerType(32)),
-            rewriter.getI32IntegerAttr(vecEl));
+            loc, rewriter.getI32Type(), vecEl);
         vecCst = rewriter.create<LLVM::InsertElementOp>(loc, vecType, vecCst,
                                                         cst, idx);
       }
@@ -293,7 +292,7 @@ static Value createMinMaxF(OpBuilder &builder, Location loc, Value lhs,
       loc, lhs.getType(),
       builder.getFloatAttr(floatType,
                            APFloat::getQNaN(floatType.getFloatSemantics())));
-  return builder.create<LLVM::SelectOp>(loc, isNan, sel, nan);
+  return builder.create<LLVM::SelectOp>(loc, isNan, nan, sel);
 }
 
 static Value createScalarOp(OpBuilder &builder, Location loc,

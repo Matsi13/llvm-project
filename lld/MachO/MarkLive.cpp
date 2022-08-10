@@ -15,8 +15,7 @@
 #include "mach-o/compact_unwind_encoding.h"
 #include "llvm/Support/TimeProfiler.h"
 
-namespace lld {
-namespace macho {
+namespace lld::macho {
 
 using namespace llvm;
 using namespace llvm::MachO;
@@ -165,8 +164,7 @@ void MarkLiveImpl<RecordWhyLive>::markTransitively() {
       // contain other types of InputSections (due to S_ATTR_LIVE_SUPPORT), but
       // those entries should never be pushed onto the worklist.
       auto *isec = cast<ConcatInputSection>(getInputSection(entry));
-      assert(isec->live &&
-             "We mark as live when pushing onto the worklist!");
+      assert(isec->live && "We mark as live when pushing onto the worklist!");
 
       // Mark all symbols listed in the relocation table for this section.
       for (const Reloc &r : isec->relocs) {
@@ -289,5 +287,4 @@ void markLive() {
   marker->markTransitively();
 }
 
-} // namespace macho
-} // namespace lld
+} // namespace lld::macho

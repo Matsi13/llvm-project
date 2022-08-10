@@ -1,4 +1,4 @@
-//===-- llvm/BinaryFormat/MachO.h - The MachO file format -------*- C++/-*-===//
+//===-- llvm/BinaryFormat/MachO.h - The MachO file format -------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -2235,6 +2235,17 @@ enum SecCSDigestAlgorithm {
       3,                           /* SHA-256 truncated to first 20 bytes */
   kSecCodeSignatureHashSHA384 = 4, /* SHA-384 */
   kSecCodeSignatureHashSHA512 = 5, /* SHA-512 */
+};
+
+enum LinkerOptimizationHintKind {
+  LOH_ARM64_ADRP_ADRP = 1,
+  LOH_ARM64_ADRP_LDR = 2,
+  LOH_ARM64_ADRP_ADD_LDR = 3,
+  LOH_ARM64_ADRP_LDR_GOT_LDR = 4,
+  LOH_ARM64_ADRP_ADD_STR = 5,
+  LOH_ARM64_ADRP_LDR_GOT_STR = 6,
+  LOH_ARM64_ADRP_ADD = 7,
+  LOH_ARM64_ADRP_LDR_GOT = 8,
 };
 
 } // end namespace MachO

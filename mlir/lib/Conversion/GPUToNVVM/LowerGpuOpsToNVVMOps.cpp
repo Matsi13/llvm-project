@@ -23,8 +23,8 @@
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/GPU/GPUDialect.h"
-#include "mlir/Dialect/GPU/Passes.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/NVVMDialect.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -89,12 +89,9 @@ struct GPUShuffleOpLowering : public ConvertOpToLLVMPattern<gpu::ShuffleOp> {
     auto resultTy = LLVM::LLVMStructType::getLiteral(rewriter.getContext(),
                                                      {valueTy, predTy});
 
-    Value one = rewriter.create<LLVM::ConstantOp>(
-        loc, int32Type, rewriter.getI32IntegerAttr(1));
-    Value minusOne = rewriter.create<LLVM::ConstantOp>(
-        loc, int32Type, rewriter.getI32IntegerAttr(-1));
-    Value thirtyTwo = rewriter.create<LLVM::ConstantOp>(
-        loc, int32Type, rewriter.getI32IntegerAttr(32));
+    Value one = rewriter.create<LLVM::ConstantOp>(loc, int32Type, 1);
+    Value minusOne = rewriter.create<LLVM::ConstantOp>(loc, int32Type, -1);
+    Value thirtyTwo = rewriter.create<LLVM::ConstantOp>(loc, int32Type, 32);
     Value numLeadInactiveLane = rewriter.create<LLVM::SubOp>(
         loc, int32Type, thirtyTwo, adaptor.width());
     // Bit mask of active lanes: `(-1) >> (32 - activeWidth)`.
@@ -166,18 +163,23 @@ struct LowerGpuOpsToNVVMOpsPass
   void runOnOperation() override {
     gpu::GPUModuleOp m = getOperation();
 
-    /// Customize the bitwidth used for the device side index computations.
+    // Request C wrapper emission.
+    for (auto func : m.getOps<func::FuncOp>()) {
+      func->setAttr(LLVM::LLVMDialect::getEmitCWrapperAttrName(),
+                    UnitAttr::get(&getContext()));
+    }
+
+    // Customize the bitwidth used for the device side index computations.
     LowerToLLVMOptions options(
         m.getContext(),
         DataLayout(cast<DataLayoutOpInterface>(m.getOperation())));
-    options.emitCWrappers = true;
     if (indexBitwidth != kDeriveIndexBitwidthFromDataLayout)
       options.overrideIndexBitwidth(indexBitwidth);
 
-    /// MemRef conversion for GPU to NVVM lowering. The GPU dialect uses memory
-    /// space 5 for private memory attributions, but NVVM represents private
-    /// memory allocations as local `alloca`s in the default address space. This
-    /// converter drops the private memory space to support the use case above.
+    // MemRef conversion for GPU to NVVM lowering. The GPU dialect uses memory
+    // space 5 for private memory attributions, but NVVM represents private
+    // memory allocations as local `alloca`s in the default address space. This
+    // converter drops the private memory space to support the use case above.
     LLVMTypeConverter converter(m.getContext(), options);
     converter.addConversion([&](MemRefType type) -> Optional<Type> {
       if (type.getMemorySpaceAsInt() !=
@@ -249,8 +251,8 @@ void mlir::populateGpuToNVVMConversionPatterns(LLVMTypeConverter &converter,
       StringAttr::get(&converter.getContext(),
                       NVVM::NVVMDialect::getKernelFuncAttrName()));
 
-  patterns.add<OpToFuncCallLowering<math::AbsOp>>(converter, "__nv_fabsf",
-                                                  "__nv_fabs");
+  patterns.add<OpToFuncCallLowering<math::AbsFOp>>(converter, "__nv_fabsf",
+                                                   "__nv_fabs");
   patterns.add<OpToFuncCallLowering<math::AtanOp>>(converter, "__nv_atanf",
                                                    "__nv_atan");
   patterns.add<OpToFuncCallLowering<math::Atan2Op>>(converter, "__nv_atan2f",

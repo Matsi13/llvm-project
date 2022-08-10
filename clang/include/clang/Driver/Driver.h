@@ -12,6 +12,7 @@
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/LLVM.h"
 #include "clang/Driver/Action.h"
+#include "clang/Driver/DriverDiagnostic.h"
 #include "clang/Driver/InputInfo.h"
 #include "clang/Driver/Options.h"
 #include "clang/Driver/Phases.h"
@@ -43,9 +44,7 @@ typedef SmallVector<InputInfo, 4> InputInfoList;
 
 class Command;
 class Compilation;
-class JobList;
 class JobAction;
-class SanitizerArgs;
 class ToolChain;
 
 /// Describes the kind of LTO mode selected via -f(no-)?lto(=.*)? options.
@@ -93,6 +92,12 @@ class Driver {
     EmbedMarker,
     EmbedBitcode
   } BitcodeEmbed;
+
+  enum OffloadMode {
+    OffloadHostDevice,
+    OffloadHost,
+    OffloadDevice,
+  } Offload;
 
   /// Header unit mode set by -fmodule-header={user,system}.
   ModuleHeaderMode CXX20HeaderType;
@@ -276,11 +281,6 @@ private:
   unsigned ProbePrecompiled : 1;
 
 public:
-  /// Force clang to emit reproducer for driver invocation. This is enabled
-  /// indirectly by setting FORCE_CLANG_DIAGNOSTICS_CRASH environment variable
-  /// or when using the -gen-reproducer driver flag.
-  unsigned GenReproducer : 1;
-
   // getFinalPhase - Determine which compilation mode we are in and record
   // which option we used to determine the final phase.
   // TODO: Much of what getFinalPhase returns are not actually true compiler
@@ -395,6 +395,9 @@ public:
   bool embedBitcodeInObject() const { return (BitcodeEmbed == EmbedBitcode); }
   bool embedBitcodeMarkerOnly() const { return (BitcodeEmbed == EmbedMarker); }
 
+  bool offloadHostOnly() const { return Offload == OffloadHost; }
+  bool offloadDeviceOnly() const { return Offload == OffloadDevice; }
+
   /// Compute the desired OpenMP runtime from the flags provided.
   OpenMPRuntimeKind getOpenMPRuntime(const llvm::opt::ArgList &Args) const;
 
@@ -505,6 +508,35 @@ public:
       StringRef AdditionalInformation = "",
       CompilationDiagnosticReport *GeneratedReport = nullptr);
 
+  enum class CommandStatus {
+    Crash = 1,
+    Error,
+    Ok,
+  };
+
+  enum class ReproLevel {
+    Off = 0,
+    OnCrash = static_cast<int>(CommandStatus::Crash),
+    OnError = static_cast<int>(CommandStatus::Error),
+    Always = static_cast<int>(CommandStatus::Ok),
+  };
+
+  bool maybeGenerateCompilationDiagnostics(
+      CommandStatus CS, ReproLevel Level, Compilation &C,
+      const Command &FailingCommand, StringRef AdditionalInformation = "",
+      CompilationDiagnosticReport *GeneratedReport = nullptr) {
+    if (static_cast<int>(CS) > static_cast<int>(Level))
+      return false;
+    if (CS != CommandStatus::Crash)
+      Diags.Report(diag::err_drv_force_crash)
+          << !::getenv("FORCE_CLANG_DIAGNOSTICS_CRASH");
+    // Hack to ensure that diagnostic notes get emitted.
+    Diags.setLastDiagnosticIgnored(false);
+    generateCompilationDiagnostics(C, FailingCommand, AdditionalInformation,
+                                   GeneratedReport);
+    return true;
+  }
+
   /// @}
   /// @name Helper Methods
   /// @{
@@ -567,6 +599,11 @@ public:
 
   /// Returns the default name for linked images (e.g., "a.out").
   const char *getDefaultImageName() const;
+
+  // Creates a temp file with $Prefix-%%%%%%.$Suffix
+  const char *CreateTempFile(Compilation &C, StringRef Prefix, StringRef Suffix,
+                             bool MultipleArchs = false,
+                             StringRef BoundArch = {}) const;
 
   /// GetNamedOutputPath - Return the name to use for the output of
   /// the action \p JA. The result is appended to the compilation's

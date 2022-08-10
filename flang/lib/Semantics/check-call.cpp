@@ -167,33 +167,46 @@ static void CheckExplicitDataArg(const characteristics::DummyDataObject &dummy,
     characteristics::TypeAndShape &actualType, bool isElemental,
     evaluate::FoldingContext &context, const Scope *scope,
     const evaluate::SpecificIntrinsic *intrinsic,
-    bool allowIntegerConversions) {
+    bool allowActualArgumentConversions) {
 
   // Basic type & rank checking
   parser::ContextualMessages &messages{context.messages()};
   CheckCharacterActual(actual, dummy.type, actualType, context, messages);
-  if (allowIntegerConversions) {
+  if (allowActualArgumentConversions) {
     ConvertIntegerActual(actual, dummy.type, actualType, messages);
   }
   bool typesCompatible{dummy.type.type().IsTkCompatibleWith(actualType.type())};
+  if (!typesCompatible && dummy.type.Rank() == 0 &&
+      allowActualArgumentConversions) {
+    // Extension: pass Hollerith literal to scalar as if it had been BOZ
+    if (auto converted{
+            evaluate::HollerithToBOZ(context, actual, dummy.type.type())}) {
+      messages.Say(
+          "passing Hollerith or character literal as if it were BOZ"_port_en_US);
+      actual = *converted;
+      actualType.type() = dummy.type.type();
+      typesCompatible = true;
+    }
+  }
   if (typesCompatible) {
     if (isElemental) {
     } else if (dummy.type.attrs().test(
                    characteristics::TypeAndShape::Attr::AssumedRank)) {
-    } else if (!dummy.type.attrs().test(
-                   characteristics::TypeAndShape::Attr::AssumedShape) &&
+    } else if (dummy.type.Rank() > 0 &&
+        !dummy.type.attrs().test(
+            characteristics::TypeAndShape::Attr::AssumedShape) &&
         !dummy.type.attrs().test(
             characteristics::TypeAndShape::Attr::DeferredShape) &&
         (actualType.Rank() > 0 || IsArrayElement(actual))) {
       // Sequence association (15.5.2.11) applies -- rank need not match
       // if the actual argument is an array or array element designator,
-      // and the dummy is not assumed-shape or an INTENT(IN) pointer
-      // that's standing in for an assumed-shape dummy.
+      // and the dummy is an array, but not assumed-shape or an INTENT(IN)
+      // pointer that's standing in for an assumed-shape dummy.
     } else {
-      // Let CheckConformance accept scalars; storage association
+      // Let CheckConformance accept actual scalars; storage association
       // cases are checked here below.
       CheckConformance(messages, dummy.type.shape(), actualType.shape(),
-          evaluate::CheckConformanceFlags::EitherScalarExpandable,
+          evaluate::CheckConformanceFlags::RightScalarExpandable,
           "dummy argument", "actual argument");
     }
   } else {
@@ -590,12 +603,13 @@ static void CheckProcedureArg(evaluate::ActualArgument &arg,
             }
           }
           if (interface.HasExplicitInterface()) {
-            if (!interface.IsCompatibleWith(argInterface)) {
+            std::string whyNot;
+            if (!interface.IsCompatibleWith(argInterface, &whyNot)) {
               // 15.5.2.9(1): Explicit interfaces must match
               if (argInterface.HasExplicitInterface()) {
                 messages.Say(
-                    "Actual procedure argument has interface incompatible with %s"_err_en_US,
-                    dummyName);
+                    "Actual procedure argument has interface incompatible with %s: %s"_err_en_US,
+                    dummyName, whyNot);
                 return;
               } else if (proc.IsPure()) {
                 messages.Say(
@@ -683,7 +697,7 @@ static void CheckExplicitInterfaceArg(evaluate::ActualArgument &arg,
     const characteristics::DummyArgument &dummy,
     const characteristics::Procedure &proc, evaluate::FoldingContext &context,
     const Scope *scope, const evaluate::SpecificIntrinsic *intrinsic,
-    bool allowIntegerConversions) {
+    bool allowActualArgumentConversions) {
   auto &messages{context.messages()};
   std::string dummyName{"dummy argument"};
   if (!dummy.name.empty()) {
@@ -714,7 +728,7 @@ static void CheckExplicitInterfaceArg(evaluate::ActualArgument &arg,
                       object.type.Rank() == 0 && proc.IsElemental()};
                   CheckExplicitDataArg(object, dummyName, *expr, *type,
                       isElemental, context, scope, intrinsic,
-                      allowIntegerConversions);
+                      allowActualArgumentConversions);
                 } else if (object.type.type().IsTypelessIntrinsicArgument() &&
                     IsBOZLiteral(*expr)) {
                   // ok
@@ -727,6 +741,15 @@ static void CheckExplicitInterfaceArg(evaluate::ActualArgument &arg,
                                        DummyDataObject::Attr::Optional)) &&
                     evaluate::IsNullPointer(*expr)) {
                   // ok, FOO(NULL())
+                } else if (object.attrs.test(characteristics::DummyDataObject::
+                                   Attr::Allocatable) &&
+                    evaluate::IsNullPointer(*expr)) {
+                  // Unsupported extension that more or less naturally falls
+                  // out of other Fortran implementations that pass separate
+                  // base address and descriptor address physical arguments
+                  messages.Say(
+                      "Null actual argument '%s' may not be associated with allocatable %s"_err_en_US,
+                      expr->AsFortran(), dummyName);
                 } else {
                   messages.Say(
                       "Actual argument '%s' associated with %s is not a variable or typed expression"_err_en_US,
@@ -853,7 +876,7 @@ static bool CheckElementalConformance(parser::ContextualMessages &messages,
                          dummy.GetIntent() == common::Intent::InOut) &&
               hasArrayArg) {
             messages.Say(
-                "In an elemental procedure with at least one array arugment, actual argument %s that corresponds to an INTENT(OUT) or INTENT(INOUT) dummay argument must be an array"_err_en_US,
+                "In an elemental procedure reference with at least one array argument, actual argument %s that corresponds to an INTENT(OUT) or INTENT(INOUT) dummy argument must be an array"_err_en_US,
                 expr->AsFortran());
           }
         }
@@ -867,7 +890,7 @@ static parser::Messages CheckExplicitInterface(
     const characteristics::Procedure &proc, evaluate::ActualArguments &actuals,
     const evaluate::FoldingContext &context, const Scope *scope,
     const evaluate::SpecificIntrinsic *intrinsic,
-    bool allowIntegerConversions) {
+    bool allowActualArgumentConversions) {
   parser::Messages buffer;
   parser::ContextualMessages messages{context.messages().at(), &buffer};
   RearrangeArguments(proc, actuals, messages);
@@ -878,7 +901,7 @@ static parser::Messages CheckExplicitInterface(
       const auto &dummy{proc.dummyArguments.at(index++)};
       if (actual) {
         CheckExplicitInterfaceArg(*actual, dummy, proc, localContext, scope,
-            intrinsic, allowIntegerConversions);
+            intrinsic, allowActualArgumentConversions);
       } else if (!dummy.IsOptional()) {
         if (dummy.name.empty()) {
           messages.Say(
@@ -909,9 +932,9 @@ parser::Messages CheckExplicitInterface(const characteristics::Procedure &proc,
 
 bool CheckInterfaceForGeneric(const characteristics::Procedure &proc,
     evaluate::ActualArguments &actuals, const evaluate::FoldingContext &context,
-    bool allowIntegerConversions) {
+    bool allowActualArgumentConversions) {
   return !CheckExplicitInterface(
-      proc, actuals, context, nullptr, nullptr, allowIntegerConversions)
+      proc, actuals, context, nullptr, nullptr, allowActualArgumentConversions)
               .AnyFatalError();
 }
 

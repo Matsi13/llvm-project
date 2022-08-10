@@ -408,7 +408,7 @@ const char *const optionalAttrParserCode = R"(
   {
     ::mlir::OptionalParseResult parseResult =
       parser.parseOptionalAttribute({0}Attr, {1}, "{0}", result.attributes);
-    if (parseResult.hasValue() && failed(*parseResult))
+    if (parseResult.has_value() && failed(*parseResult))
       return ::mlir::failure();
   }
 )";
@@ -445,7 +445,7 @@ const char *const enumAttrParserCode = R"(
         parser.parseOptionalAttribute(attrVal,
                                       parser.getBuilder().getNoneType(),
                                       "{0}", attrStorage);
-      if (parseResult.hasValue()) {{
+      if (parseResult.has_value()) {{
         if (failed(*parseResult))
           return ::mlir::failure();
         attrStr = attrVal.getValue();
@@ -479,7 +479,7 @@ const char *const optionalOperandParserCode = R"(
     ::mlir::OpAsmParser::UnresolvedOperand operand;
     ::mlir::OptionalParseResult parseResult =
                                     parser.parseOptionalOperand(operand);
-    if (parseResult.hasValue()) {
+    if (parseResult.has_value()) {
       if (failed(*parseResult))
         return ::mlir::failure();
       {0}Operands.push_back(operand);
@@ -532,7 +532,7 @@ const char *const optionalTypeParserCode = R"(
     ::mlir::Type optionalType;
     ::mlir::OptionalParseResult parseResult =
                                     parser.parseOptionalType(optionalType);
-    if (parseResult.hasValue()) {
+    if (parseResult.has_value()) {
       if (failed(*parseResult))
         return ::mlir::failure();
       {0}Types.push_back(optionalType);
@@ -584,7 +584,7 @@ const char *regionListParserCode = R"(
   {
     std::unique_ptr<::mlir::Region> region;
     auto firstRegionResult = parser.parseOptionalRegion(region);
-    if (firstRegionResult.hasValue()) {
+    if (firstRegionResult.has_value()) {
       if (failed(*firstRegionResult))
         return ::mlir::failure();
       {0}Regions.emplace_back(std::move(region));
@@ -622,7 +622,7 @@ const char *regionListEnsureSingleBlockParserCode = R"(
 const char *optionalRegionParserCode = R"(
   {
      auto parseResult = parser.parseOptionalRegion(*{0}Region);
-     if (parseResult.hasValue() && failed(*parseResult))
+     if (parseResult.has_value() && failed(*parseResult))
        return ::mlir::failure();
   }
 )";
@@ -656,7 +656,7 @@ const char *successorListParserCode = R"(
   {
     ::mlir::Block *succ;
     auto firstSucc = parser.parseOptionalSuccessor(succ);
-    if (firstSucc.hasValue()) {
+    if (firstSucc.has_value()) {
       if (failed(*firstSucc))
         return ::mlir::failure();
       {0}Successors.emplace_back(succ);
@@ -793,7 +793,7 @@ static void genElementParserStorage(FormatElement *element, const Operator &op,
       genElementParserStorage(paramElement, op, body);
 
   } else if (isa<OperandsDirective>(element)) {
-    body << "  ::mlir::SmallVector<::mlir::OpAsmParser::UnresolvedOperand, 4> "
+    body << "  ::llvm::SmallVector<::mlir::OpAsmParser::UnresolvedOperand, 4> "
             "allOperands;\n";
 
   } else if (isa<RegionsDirective>(element)) {
@@ -812,7 +812,7 @@ static void genElementParserStorage(FormatElement *element, const Operator &op,
     StringRef name = operand->getVar()->name;
     if (operand->getVar()->isVariableLength()) {
       body
-          << "  ::mlir::SmallVector<::mlir::OpAsmParser::UnresolvedOperand, 4> "
+          << "  ::llvm::SmallVector<::mlir::OpAsmParser::UnresolvedOperand, 4> "
           << name << "Operands;\n";
       if (operand->getVar()->isVariadicOfVariadic()) {
         body << "    llvm::SmallVector<int32_t> " << name
@@ -855,7 +855,7 @@ static void genElementParserStorage(FormatElement *element, const Operator &op,
     ArgumentLengthKind lengthKind;
     StringRef name = getTypeListName(dir->getArg(), lengthKind);
     if (lengthKind != ArgumentLengthKind::Single)
-      body << "  ::mlir::SmallVector<::mlir::Type, 1> " << name << "Types;\n";
+      body << "  ::llvm::SmallVector<::mlir::Type, 1> " << name << "Types;\n";
     else
       body << llvm::formatv("  ::mlir::Type {0}RawTypes[1];\n", name)
            << llvm::formatv(
@@ -1001,7 +1001,7 @@ static void genCustomDirectiveParser(CustomDirective *dir, MethodBody &body) {
     } else if (auto *operand = dyn_cast<OperandVariable>(param)) {
       const NamedTypeConstraint *var = operand->getVar();
       if (var->isOptional()) {
-        body << llvm::formatv("    if ({0}Operand.hasValue())\n"
+        body << llvm::formatv("    if ({0}Operand.has_value())\n"
                               "      {0}Operands.push_back(*{0}Operand);\n",
                               var->name);
       } else if (var->isVariadicOfVariadic()) {
@@ -1043,7 +1043,7 @@ static void genEnumAttrParser(const NamedAttribute *var, MethodBody &body,
   {
     llvm::raw_string_ostream os(attrBuilderStr);
     os << tgfmt(enumAttr.getConstBuilderTemplate(), &attrTypeCtx,
-                "attrOptional.getValue()");
+                "attrOptional.value()");
   }
 
   // Build a string containing the cases that can be formatted as a keyword.
@@ -2147,7 +2147,8 @@ void OperationFormat::genPrinter(Operator &op, OpClass &opClass) {
 
 /// Function to find an element within the given range that has the same name as
 /// 'name'.
-template <typename RangeT> static auto findArg(RangeT &&range, StringRef name) {
+template <typename RangeT>
+static auto findArg(RangeT &&range, StringRef name) {
   auto it = llvm::find_if(range, [=](auto &arg) { return arg.name == name; });
   return it != range.end() ? &*it : nullptr;
 }
@@ -2304,7 +2305,7 @@ LogicalResult OpFormatParser::verify(SMLoc loc,
       //    DeclareOpInterfaceMethods<InferTypeOpInterface>
       // and the like.
       // TODO: Add hasCppInterface check.
-      if (auto name = def.getValueAsOptionalString("cppClassName")) {
+      if (auto name = def.getValueAsOptionalString("cppInterfaceName")) {
         if (*name == "InferTypeOpInterface" &&
             def.getValueAsString("cppNamespace") == "::mlir")
           canInferResultTypes = true;

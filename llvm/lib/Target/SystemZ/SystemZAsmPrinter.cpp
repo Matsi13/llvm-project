@@ -143,6 +143,9 @@ void SystemZAsmPrinter::emitCallInformation(CallType CT) {
 }
 
 void SystemZAsmPrinter::emitInstruction(const MachineInstr *MI) {
+  SystemZ_MC::verifyInstructionPredicates(MI->getOpcode(),
+                                          getSubtargetInfo().getFeatureBits());
+
   SystemZMCInstLower Lower(MF->getContext(), *this);
   MCInst LoweredMI;
   switch (MI->getOpcode()) {
@@ -641,11 +644,11 @@ void SystemZAsmPrinter::LowerFENTRY_CALL(const MachineInstr &MI,
   MCContext &Ctx = MF->getContext();
   if (MF->getFunction().hasFnAttribute("mrecord-mcount")) {
     MCSymbol *DotSym = OutContext.createTempSymbol();
-    OutStreamer->PushSection();
-    OutStreamer->SwitchSection(
+    OutStreamer->pushSection();
+    OutStreamer->switchSection(
         Ctx.getELFSection("__mcount_loc", ELF::SHT_PROGBITS, ELF::SHF_ALLOC));
     OutStreamer->emitSymbolValue(DotSym, 8);
-    OutStreamer->PopSection();
+    OutStreamer->popSection();
     OutStreamer->emitLabel(DotSym);
   }
 
@@ -663,8 +666,7 @@ void SystemZAsmPrinter::LowerFENTRY_CALL(const MachineInstr &MI,
 }
 
 void SystemZAsmPrinter::LowerSTACKMAP(const MachineInstr &MI) {
-  const SystemZInstrInfo *TII =
-    static_cast<const SystemZInstrInfo *>(MF->getSubtarget().getInstrInfo());
+  auto *TII = MF->getSubtarget<SystemZSubtarget>().getInstrInfo();
 
   unsigned NumNOPBytes = MI.getOperand(1).getImm();
 
@@ -826,10 +828,10 @@ void SystemZAsmPrinter::emitFunctionBodyEnd() {
     MCSymbol *FnEndSym = createTempSymbol("func_end");
     OutStreamer->emitLabel(FnEndSym);
 
-    OutStreamer->PushSection();
-    OutStreamer->SwitchSection(getObjFileLowering().getPPA1Section());
+    OutStreamer->pushSection();
+    OutStreamer->switchSection(getObjFileLowering().getPPA1Section());
     emitPPA1(FnEndSym);
-    OutStreamer->PopSection();
+    OutStreamer->popSection();
 
     CurrentFnPPA1Sym = nullptr;
     CurrentFnEPMarkerSym = nullptr;
@@ -970,6 +972,7 @@ void SystemZAsmPrinter::emitPPA1(MCSymbol *FnEndSym) {
   uint8_t FrameReg = TRI->getEncodingValue(TRI->getFrameRegister(*MF));
   uint8_t AllocaReg = ZFL->hasFP(*MF) ? FrameReg : 0;
   assert(AllocaReg < 16 && "Can't have alloca register larger than 15");
+  (void)AllocaReg;
 
   // Build FPR save area offset.
   uint32_t FrameAndFPROffset = 0;
@@ -1051,8 +1054,7 @@ void SystemZAsmPrinter::emitPPA1(MCSymbol *FnEndSym) {
 }
 
 void SystemZAsmPrinter::emitFunctionEntryLabel() {
-  const SystemZSubtarget &Subtarget =
-      static_cast<const SystemZSubtarget &>(MF->getSubtarget());
+  const SystemZSubtarget &Subtarget = MF->getSubtarget<SystemZSubtarget>();
 
   if (Subtarget.getTargetTriple().isOSzOS()) {
     MCContext &OutContext = OutStreamer->getContext();

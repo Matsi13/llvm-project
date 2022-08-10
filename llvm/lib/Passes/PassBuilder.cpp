@@ -375,6 +375,17 @@ bool shouldPopulateClassToPassNames() {
          !printAfterPasses().empty();
 }
 
+// A pass for testing -print-on-crash.
+// DO NOT USE THIS EXCEPT FOR TESTING!
+class TriggerCrashPass : public PassInfoMixin<TriggerCrashPass> {
+public:
+  PreservedAnalyses run(Module &, ModuleAnalysisManager &) {
+    abort();
+    return PreservedAnalyses::all();
+  }
+  static StringRef name() { return "TriggerCrashPass"; }
+};
+
 } // namespace
 
 PassBuilder::PassBuilder(TargetMachine *TM, PipelineTuningOptions PTO,
@@ -837,6 +848,11 @@ parseStackLifetimeOptions(StringRef Params) {
     }
   }
   return Result;
+}
+
+Expected<bool> parseDependenceAnalysisPrinterOptions(StringRef Params) {
+  return parseSinglePassOption(Params, "normalized-results",
+                               "DependenceAnalysisPrinter");
 }
 
 } // namespace
@@ -1383,8 +1399,10 @@ Error PassBuilder::parseFunctionPass(FunctionPassManager &FPM,
         return Err;
       // Add the nested pass manager with the appropriate adaptor.
       bool UseMemorySSA = (Name == "loop-mssa");
-      bool UseBFI = llvm::any_of(
-          InnerPipeline, [](auto Pipeline) { return Pipeline.Name == "licm"; });
+      bool UseBFI = llvm::any_of(InnerPipeline, [](auto Pipeline) {
+        return Pipeline.Name.contains("licm") ||
+               Pipeline.Name.contains("simple-loop-unswitch");
+      });
       bool UseBPI = llvm::any_of(InnerPipeline, [](auto Pipeline) {
         return Pipeline.Name == "loop-predication";
       });

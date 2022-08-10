@@ -896,12 +896,11 @@ define float @extra_args_no_replace(float* nocapture readonly %x, i32 %a, i32 %b
 ; THRESHOLD-NEXT:    [[TMP3:%.*]] = insertelement <2 x i32> poison, i32 [[C:%.*]], i32 1
 ; THRESHOLD-NEXT:    [[TMP4:%.*]] = insertelement <2 x i32> [[TMP3]], i32 [[MUL]], i32 0
 ; THRESHOLD-NEXT:    [[TMP5:%.*]] = sitofp <2 x i32> [[TMP4]] to <2 x float>
-; THRESHOLD-NEXT:    [[TMP6:%.*]] = extractelement <2 x float> [[TMP5]], i32 0
-; THRESHOLD-NEXT:    [[TMP7:%.*]] = insertelement <2 x float> <float poison, float 3.000000e+00>, float [[TMP6]], i32 0
-; THRESHOLD-NEXT:    [[TMP8:%.*]] = fadd fast <2 x float> [[TMP5]], [[TMP7]]
-; THRESHOLD-NEXT:    [[TMP9:%.*]] = extractelement <2 x float> [[TMP8]], i32 0
-; THRESHOLD-NEXT:    [[TMP10:%.*]] = extractelement <2 x float> [[TMP8]], i32 1
-; THRESHOLD-NEXT:    [[OP_RDX2:%.*]] = fadd fast float [[TMP9]], [[TMP10]]
+; THRESHOLD-NEXT:    [[TMP6:%.*]] = shufflevector <2 x float> <float poison, float 3.000000e+00>, <2 x float> [[TMP5]], <2 x i32> <i32 2, i32 1>
+; THRESHOLD-NEXT:    [[TMP7:%.*]] = fadd fast <2 x float> [[TMP5]], [[TMP6]]
+; THRESHOLD-NEXT:    [[TMP8:%.*]] = extractelement <2 x float> [[TMP7]], i32 0
+; THRESHOLD-NEXT:    [[TMP9:%.*]] = extractelement <2 x float> [[TMP7]], i32 1
+; THRESHOLD-NEXT:    [[OP_RDX2:%.*]] = fadd fast float [[TMP8]], [[TMP9]]
 ; THRESHOLD-NEXT:    [[OP_RDX3:%.*]] = fadd fast float [[TMP2]], [[OP_RDX2]]
 ; THRESHOLD-NEXT:    ret float [[OP_RDX3]]
 ;
@@ -1002,8 +1001,8 @@ define i32 @wobble(i32 %arg, i32 %bar) {
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq <4 x i32> [[TMP2]], zeroinitializer
 ; CHECK-NEXT:    [[TMP5:%.*]] = sext <4 x i1> [[TMP4]] to <4 x i32>
 ; CHECK-NEXT:    [[TMP6:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[TMP5]])
-; CHECK-NEXT:    [[OP_RDX:%.*]] = add nuw i32 [[TMP3]], [[ARG]]
-; CHECK-NEXT:    [[OP_RDX2:%.*]] = add nsw i32 [[TMP6]], [[OP_RDX]]
+; CHECK-NEXT:    [[OP_RDX:%.*]] = add i32 [[TMP3]], [[ARG]]
+; CHECK-NEXT:    [[OP_RDX2:%.*]] = add i32 [[TMP6]], [[OP_RDX]]
 ; CHECK-NEXT:    ret i32 [[OP_RDX2]]
 ;
 ; THRESHOLD-LABEL: @wobble(
@@ -1017,8 +1016,8 @@ define i32 @wobble(i32 %arg, i32 %bar) {
 ; THRESHOLD-NEXT:    [[TMP4:%.*]] = icmp eq <4 x i32> [[TMP2]], zeroinitializer
 ; THRESHOLD-NEXT:    [[TMP5:%.*]] = sext <4 x i1> [[TMP4]] to <4 x i32>
 ; THRESHOLD-NEXT:    [[TMP6:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[TMP5]])
-; THRESHOLD-NEXT:    [[OP_RDX:%.*]] = add nuw i32 [[TMP3]], [[ARG]]
-; THRESHOLD-NEXT:    [[OP_RDX2:%.*]] = add nsw i32 [[TMP6]], [[OP_RDX]]
+; THRESHOLD-NEXT:    [[OP_RDX:%.*]] = add i32 [[TMP3]], [[ARG]]
+; THRESHOLD-NEXT:    [[OP_RDX2:%.*]] = add i32 [[TMP6]], [[OP_RDX]]
 ; THRESHOLD-NEXT:    ret i32 [[OP_RDX2]]
 ;
   bb:

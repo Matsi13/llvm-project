@@ -38,6 +38,8 @@ const Scope &GetTopLevelUnitContaining(const Scope &);
 const Scope &GetTopLevelUnitContaining(const Symbol &);
 const Scope &GetProgramUnitContaining(const Scope &);
 const Scope &GetProgramUnitContaining(const Symbol &);
+const Scope &GetProgramUnitOrBlockConstructContaining(const Scope &);
+const Scope &GetProgramUnitOrBlockConstructContaining(const Symbol &);
 
 const Scope *FindModuleContaining(const Scope &);
 const Scope *FindModuleFileContaining(const Scope &);
@@ -86,6 +88,7 @@ bool DoesScopeContain(const Scope *maybeAncestor, const Scope &maybeDescendent);
 bool DoesScopeContain(const Scope *, const Symbol &);
 bool IsUseAssociated(const Symbol &, const Scope &);
 bool IsHostAssociated(const Symbol &, const Scope &);
+bool IsHostAssociatedIntoSubprogram(const Symbol &, const Scope &);
 inline bool IsStmtFunction(const Symbol &symbol) {
   const auto *subprogram{symbol.detailsIf<SubprogramDetails>()};
   return subprogram && subprogram->stmtFunction();
@@ -613,6 +616,11 @@ bool HasDefinedIo(
 // defined I/O procedure.
 const Symbol *FindUnsafeIoDirectComponent(
     GenericKind::DefinedIo, const DerivedTypeSpec &, const Scope * = nullptr);
+
+// Some intrinsic operators have more than one name (e.g. `operator(.eq.)` and
+// `operator(==)`). GetAllNames() returns them all, including symbolName.
+std::forward_list<std::string> GetAllNames(
+    const SemanticsContext &, const SourceName &);
 
 } // namespace Fortran::semantics
 #endif // FORTRAN_SEMANTICS_TOOLS_H_

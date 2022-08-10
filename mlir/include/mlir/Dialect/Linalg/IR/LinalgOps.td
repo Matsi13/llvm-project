@@ -27,11 +27,16 @@ class Linalg_Op<string mnemonic, list<Trait> traits = []> :
 def Linalg_InitTensorOp : Linalg_Op<"init_tensor",
     [NoSideEffect,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>]> {
-  let summary = "operation to define a tensor of particular value";
+  let summary = "operation to define a tensor of particular shape";
 
   let description = [{
-    `linalg.init_tensor` is an operation that materializes a tensor of
-    a given shape. The shape could be dynamic or static.
+    `linalg.init_tensor` is an operation that defines a tensor of a particular
+    shape. The shape could be dynamic or static. The contents of the tensor are
+    unspecified and the only purpose of the op result is to materialize the
+    specified shape in IR and make it available to other transformations.
+
+    Note: This op can be lowered to a `bufferization.alloc_tensor`, at which
+    point it turns into an explicit buffer allocation.
   }];
 
   let arguments =
@@ -45,7 +50,7 @@ def Linalg_InitTensorOp : Linalg_Op<"init_tensor",
   }];
 
   let extraClassDeclaration = [{
-    static StringRef getStaticSizesAttrName() {
+    static StringRef getStaticSizesAttrStrName() {
       return "static_sizes";
     }
 
@@ -59,7 +64,7 @@ def Linalg_InitTensorOp : Linalg_Op<"init_tensor",
 
     // Return true if the size of the tensor is dynamic at `idx`
     bool isDynamicSize(unsigned idx) {
-      APInt v = *(static_sizes().getAsValueRange<IntegerAttr>().begin() + idx);
+      APInt v = *(getStaticSizes().getAsValueRange<IntegerAttr>().begin() + idx);
       return ShapedType::isDynamic(v.getSExtValue());
     }
 
@@ -67,7 +72,7 @@ def Linalg_InitTensorOp : Linalg_Op<"init_tensor",
     // and return the shape.
     int64_t getStaticSize(unsigned idx) {
       assert(!isDynamicSize(idx) && "expected static size");
-      APInt v = *(static_sizes().
+      APInt v = *(getStaticSizes().
           template getAsValueRange<IntegerAttr>().begin() + idx);
         return v.getSExtValue();
     }
@@ -78,8 +83,8 @@ def Linalg_InitTensorOp : Linalg_Op<"init_tensor",
     unsigned getIndexOfDynamicSize(unsigned idx) {
       assert(isDynamicSize(idx) && "expected dynamic size");
       return std::count_if(
-          static_sizes().getValue().begin(),
-          static_sizes().getValue().begin() + idx,
+          getStaticSizes().getValue().begin(),
+          getStaticSizes().getValue().begin() + idx,
           [&](Attribute attr) {
             return ShapedType::isDynamic(attr.cast<IntegerAttr>().getInt());
           });

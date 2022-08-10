@@ -21,7 +21,7 @@ namespace mlir {
 namespace sparse_tensor {
 
 /// Dimension level type for a tensor (undef means index does not appear).
-enum Dim { kSparse, kDense, kSingle, kUndef };
+enum Dim { kSparse, kDense, kUndef };
 
 /// Tensor expression kind.
 enum Kind {
@@ -31,14 +31,21 @@ enum Kind {
   kIndex,
   // Unary operations.
   kAbsF,
+  kAbsC,
   kCeilF,
   kFloorF,
   kSqrtF,
+  kSqrtC,
   kExpm1F,
+  kExpm1C,
   kLog1pF,
+  kLog1pC,
   kSinF,
+  kSinC,
   kTanhF,
+  kTanhC,
   kNegF,
+  kNegC,
   kNegI,
   kTruncF,
   kExtF,
@@ -60,12 +67,14 @@ enum Kind {
   kMulC,
   kMulI,
   kDivF,
+  kDivC, // complex
   kDivS, // signed
   kDivU, // unsigned
   kAddF,
   kAddC,
   kAddI,
   kSubF,
+  kSubC,
   kSubI,
   kAndI,
   kOrI,

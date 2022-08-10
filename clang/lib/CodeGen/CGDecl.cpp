@@ -473,7 +473,7 @@ void CodeGenFunction::EmitStaticVarDecl(const VarDecl &D,
   LocalDeclMap.find(&D)->second = Address(castedAddr, elemTy, alignment);
   CGM.setStaticLocalDeclAddress(&D, castedAddr);
 
-  CGM.getSanitizerMetadata()->reportGlobalToASan(var, D);
+  CGM.getSanitizerMetadata()->reportGlobal(var, D);
 
   // Emit global variable debug descriptor for static vars.
   CGDebugInfo *DI = getDebugInfo();
@@ -839,7 +839,7 @@ void CodeGenFunction::EmitScalarInit(const Expr *init, const ValueDecl *D,
     // If D is pseudo-strong, treat it like __unsafe_unretained here. This means
     // that we omit the retain, and causes non-autoreleased return values to be
     // immediately released.
-    LLVM_FALLTHROUGH;
+    [[fallthrough]];
   }
 
   case Qualifiers::OCL_ExplicitNone:
@@ -2693,4 +2693,23 @@ void CodeGenModule::EmitOMPAllocateDecl(const OMPAllocateDecl *D) {
     DummyGV->replaceAllUsesWith(NewPtrForOldDecl);
     DummyGV->eraseFromParent();
   }
+}
+
+llvm::Optional<CharUnits>
+CodeGenModule::getOMPAllocateAlignment(const VarDecl *VD) {
+  if (const auto *AA = VD->getAttr<OMPAllocateDeclAttr>()) {
+    if (Expr *Alignment = AA->getAlignment()) {
+      unsigned UserAlign =
+          Alignment->EvaluateKnownConstInt(getContext()).getExtValue();
+      CharUnits NaturalAlign =
+          getNaturalTypeAlignment(VD->getType().getNonReferenceType());
+
+      // OpenMP5.1 pg 185 lines 7-10
+      //   Each item in the align modifier list must be aligned to the maximum
+      //   of the specified alignment and the type's natural alignment.
+      return CharUnits::fromQuantity(
+          std::max<unsigned>(UserAlign, NaturalAlign.getQuantity()));
+    }
+  }
+  return llvm::None;
 }

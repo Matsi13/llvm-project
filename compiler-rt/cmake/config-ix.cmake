@@ -4,8 +4,18 @@ include(CheckCCompilerFlag)
 include(CheckCXXCompilerFlag)
 include(CheckIncludeFiles)
 include(CheckLibraryExists)
+include(LLVMCheckCompilerLinkerFlag)
 include(CheckSymbolExists)
 include(TestBigEndian)
+
+# The compiler driver may be implicitly trying to link against libunwind.
+# This is normally ok (libcxx relies on an unwinder), but if libunwind is
+# built in the same cmake invocation as compiler-rt and we're using the
+# in tree version of runtimes, we'd be linking against the just-built
+# libunwind (and the compiler implicit -lunwind wouldn't succeed as the newly
+# built libunwind isn't installed yet). For those cases, it'd be good to
+# link with --uwnindlib=none. Check if that option works.
+llvm_check_compiler_linker_flag(C "--unwindlib=none" CXX_SUPPORTS_UNWINDLIB_NONE_FLAG)
 
 check_library_exists(c fopen "" COMPILER_RT_HAS_LIBC)
 if (COMPILER_RT_USE_BUILTINS_LIBRARY)
@@ -71,7 +81,7 @@ check_cxx_compiler_flag(-fvisibility=hidden  COMPILER_RT_HAS_FVISIBILITY_HIDDEN_
 check_cxx_compiler_flag(-frtti               COMPILER_RT_HAS_FRTTI_FLAG)
 check_cxx_compiler_flag(-fno-rtti            COMPILER_RT_HAS_FNO_RTTI_FLAG)
 check_cxx_compiler_flag("-Werror -fno-function-sections" COMPILER_RT_HAS_FNO_FUNCTION_SECTIONS_FLAG)
-check_cxx_compiler_flag(-std=c++14           COMPILER_RT_HAS_STD_CXX14_FLAG)
+check_cxx_compiler_flag(-std=c++17           COMPILER_RT_HAS_STD_CXX17_FLAG)
 check_cxx_compiler_flag(-ftls-model=initial-exec COMPILER_RT_HAS_FTLS_MODEL_INITIAL_EXEC)
 check_cxx_compiler_flag(-fno-lto             COMPILER_RT_HAS_FNO_LTO_FLAG)
 check_cxx_compiler_flag(-fno-profile-generate COMPILER_RT_HAS_FNO_PROFILE_GENERATE_FLAG)

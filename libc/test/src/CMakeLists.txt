@@ -21,8 +21,8 @@ function(add_fp_unittest name)
 
   add_libc_unittest(
     ${name}
-    "${MATH_UNITTEST_UNPARSED_ARGUMENTS}"
     LINK_LIBRARIES "${MATH_UNITTEST_LINK_LIBRARIES}"
+    "${MATH_UNITTEST_UNPARSED_ARGUMENTS}"
   )
 endfunction(add_fp_unittest)
 
@@ -45,12 +45,12 @@ if(NOT LLVM_LIBC_FULL_BUILD)
   return()
 endif()
 
+add_subdirectory(dirent)
 # The signal API is currently disabled as signal.h is incorrect.
 # since assert uses the signal API, we disable assert also.
 # add_subdirectory(assert)
 # add_subdirectory(signal)
 add_subdirectory(stdio)
-add_subdirectory(threads)
 add_subdirectory(time)
 
 if(${LIBC_TARGET_OS} STREQUAL "linux")
@@ -96,6 +96,8 @@ set_target_properties(
   PROPERTIES
   INCLUDE_DIRECTORIES ""
 )
+target_link_libraries(libc-api-test llvmlibc)
+
 # Only include we need is the include for cpp::IsSame and our generated
 # public headers.
 target_include_directories(

@@ -2,13 +2,12 @@ add_subdirectory(GlobalISel)
 
 set(LLVM_LINK_COMPONENTS Support)
 
-add_tablegen(llvm-tblgen LLVM
+add_tablegen(llvm-tblgen LLVM DESTINATION "${LLVM_TOOLS_INSTALL_DIR}"
   AsmMatcherEmitter.cpp
   AsmWriterEmitter.cpp
   AsmWriterInst.cpp
   Attributes.cpp
   CallingConvEmitter.cpp
-  CodeBeadsGen.cpp
   CodeEmitterGen.cpp
   CodeGenDAGPatterns.cpp
   CodeGenHwModes.cpp
@@ -27,6 +26,7 @@ add_tablegen(llvm-tblgen LLVM
   DFAPacketizerEmitter.cpp
   DirectiveEmitter.cpp
   DisassemblerEmitter.cpp
+  DXILEmitter.cpp
   ExegesisEmitter.cpp
   FastISelEmitter.cpp
   GICombinerEmitter.cpp

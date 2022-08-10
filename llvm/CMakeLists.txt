@@ -2,6 +2,11 @@
 
 cmake_minimum_required(VERSION 3.13.4)
 
+# CMP0114: ExternalProject step targets fully adopt their steps.
+# New in CMake 3.19: https://cmake.org/cmake/help/latest/policy/CMP0114.html
+if(POLICY CMP0114)
+  cmake_policy(SET CMP0114 OLD)
+endif()
 # CMP0116: Ninja generators transform `DEPFILE`s from `add_custom_command()`
 # New in CMake 3.20. https://cmake.org/cmake/help/latest/policy/CMP0116.html
 if(POLICY CMP0116)
@@ -11,7 +16,7 @@ endif()
 set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 
 if(NOT DEFINED LLVM_VERSION_MAJOR)
-  set(LLVM_VERSION_MAJOR 15)
+  set(LLVM_VERSION_MAJOR 16)
 endif()
 if(NOT DEFINED LLVM_VERSION_MINOR)
   set(LLVM_VERSION_MINOR 0)
@@ -53,8 +58,25 @@ project(LLVM
 # Must go after project(..)
 include(GNUInstallDirs)
 
-set(CMAKE_CXX_STANDARD 14 CACHE STRING "C++ standard to conform to")
+# This C++ standard is required to build LLVM.
+set(LLVM_REQUIRED_CXX_STANDARD 17)
+
+# If we find that the cache contains CMAKE_CXX_STANDARD it means that it's a old CMakeCache.txt
+# and we can just inform the user and then reset it.
+if($CACHE{CMAKE_CXX_STANDARD} AND $CACHE{CMAKE_CXX_STANDARD} LESS ${LLVM_REQUIRED_CXX_STANDARD})
+  message(WARNING "Resetting cache value for CMAKE_CXX_STANDARD to ${LLVM_REQUIRED_CXX_STANDARD}")
+  unset(CMAKE_CXX_STANDARD CACHE)
+endif()
+
+# if CMAKE_CXX_STANDARD is still set after the cache unset above it means that the user requested it
+# and we allow it to be set to something newer than the required standard but otherwise we fail.
+if(DEFINED CMAKE_CXX_STANDARD AND CMAKE_CXX_STANDARD LESS ${LLVM_REQUIRED_CXX_STANDARD})
+  message(FATAL_ERROR "Requested CMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD} which is less than the required ${LLVM_REQUIRED_CXX_STANDARD}.")
+endif()
+
+set(CMAKE_CXX_STANDARD ${LLVM_REQUIRED_CXX_STANDARD} CACHE STRING "C++ standard to conform to")
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
+
 if (CYGWIN)
   # Cygwin is a bit stricter and lack things like 'strdup', 'stricmp', etc in
   # c++xx mode.
@@ -173,11 +195,12 @@ set(LLVM_CCACHE_BUILD OFF CACHE BOOL "Set to ON for a ccache enabled build")
 if(LLVM_CCACHE_BUILD)
   find_program(CCACHE_PROGRAM ccache)
   if(CCACHE_PROGRAM)
-      set(LLVM_CCACHE_MAXSIZE "" CACHE STRING "Size of ccache")
-      set(LLVM_CCACHE_DIR "" CACHE STRING "Directory to keep ccached data")
-      set(LLVM_CCACHE_PARAMS "CCACHE_CPP2=yes CCACHE_HASHDIR=yes"
-          CACHE STRING "Parameters to pass through to ccache")
+    set(LLVM_CCACHE_MAXSIZE "" CACHE STRING "Size of ccache")
+    set(LLVM_CCACHE_DIR "" CACHE STRING "Directory to keep ccached data")
+    set(LLVM_CCACHE_PARAMS "CCACHE_CPP2=yes CCACHE_HASHDIR=yes"
+        CACHE STRING "Parameters to pass through to ccache")
 
+    if(NOT CMAKE_SYSTEM_NAME MATCHES "Windows")
       set(CCACHE_PROGRAM "${LLVM_CCACHE_PARAMS} ${CCACHE_PROGRAM}")
       if (LLVM_CCACHE_MAXSIZE)
         set(CCACHE_PROGRAM "CCACHE_MAXSIZE=${LLVM_CCACHE_MAXSIZE} ${CCACHE_PROGRAM}")
@@ -186,6 +209,16 @@ if(LLVM_CCACHE_BUILD)
         set(CCACHE_PROGRAM "CCACHE_DIR=${LLVM_CCACHE_DIR} ${CCACHE_PROGRAM}")
       endif()
       set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ${CCACHE_PROGRAM})
+    else()
+      if(LLVM_CCACHE_MAXSIZE OR LLVM_CCACHE_DIR OR
+         NOT LLVM_CCACHE_PARAMS MATCHES "CCACHE_CPP2=yes CCACHE_HASHDIR=yes")
+        message(FATAL_ERROR "Ccache configuration through CMake is not supported on Windows. Please use environment variables.")
+      endif()
+      # RULE_LAUNCH_COMPILE should work with Ninja but currently has issues
+      # with cmd.exe and some MSVC tools other than cl.exe
+      set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+      set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+    endif()
   else()
     message(FATAL_ERROR "Unable to find the program ccache. Set LLVM_CCACHE_BUILD to OFF")
   endif()
@@ -252,6 +285,8 @@ include(VersionFromVCS)
 
 option(LLVM_APPEND_VC_REV
   "Embed the version control system revision in LLVM" ON)
+
+option(LLVM_TOOL_LLVM_DRIVER_BUILD "Enables building the llvm multicall tool" OFF)
 
 set(PACKAGE_NAME LLVM)
 set(PACKAGE_STRING "${PACKAGE_NAME} ${PACKAGE_VERSION}")
@@ -420,7 +455,11 @@ endif()
 
 set(LLVM_ENABLE_ZLIB "ON" CACHE STRING "Use zlib for compression/decompression if available. Can be ON, OFF, or FORCE_ON")
 
+set(LLVM_ENABLE_ZSTD "ON" CACHE STRING "Use zstd for compression/decompression if available. Can be ON, OFF, or FORCE_ON")
+
 set(LLVM_ENABLE_CURL "OFF" CACHE STRING "Use libcurl for the HTTP client if available. Can be ON, OFF, or FORCE_ON")
+
+set(LLVM_ENABLE_HTTPLIB "OFF" CACHE STRING "Use cpp-httplib HTTP server library if available. Can be ON, OFF, or FORCE_ON")
 
 set(LLVM_Z3_INSTALL_DIR "" CACHE STRING "Install directory of the Z3 solver.")
 
@@ -728,11 +767,30 @@ endif()
 set(LLVM_TARGET_TRIPLE_ENV CACHE STRING "The name of environment variable to override default target. Disabled by blank.")
 mark_as_advanced(LLVM_TARGET_TRIPLE_ENV)
 
-set(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR OFF CACHE BOOL
+# Per target dir not yet supported on Arm 32 bit due to arm vs armhf handling
+if(CMAKE_SYSTEM_NAME MATCHES "Linux" AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^arm")
+  set(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR_default ON)
+else()
+  set(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR_default OFF)
+endif()
+set(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR ${LLVM_ENABLE_PER_TARGET_RUNTIME_DIR_default} CACHE BOOL
   "Enable per-target runtimes directory")
 
 set(LLVM_PROFDATA_FILE "" CACHE FILEPATH
   "Profiling data file to use when compiling in order to improve runtime performance.")
+
+if(LLVM_INCLUDE_TESTS)
+  # Lit test suite requires at least python 3.6
+  set(LLVM_MINIMUM_PYTHON_VERSION 3.6)
+else()
+  # FIXME: it is unknown if this is the actual minimum bound
+  set(LLVM_MINIMUM_PYTHON_VERSION 3.0)
+endif()
+
+# Find python before including config-ix, since it needs to be able to search
+# for python modules.
+find_package(Python3 ${LLVM_MINIMUM_PYTHON_VERSION} REQUIRED
+    COMPONENTS Interpreter)
 
 # All options referred to from HandleLLVMOptions have to be specified
 # BEFORE this include, otherwise options will not be correctly set on
@@ -779,9 +837,6 @@ if(NOT LLVM_ENABLE_NEW_PASS_MANAGER)
 endif()
 
 include(HandleLLVMOptions)
-
-find_package(Python3 ${LLVM_MINIMUM_PYTHON_VERSION} REQUIRED
-    COMPONENTS Interpreter)
 
 ######
 
@@ -1083,6 +1138,7 @@ if( LLVM_INCLUDE_UTILS )
   add_subdirectory(utils/PerfectShuffle)
   add_subdirectory(utils/count)
   add_subdirectory(utils/not)
+  add_subdirectory(utils/UnicodeData)
   add_subdirectory(utils/yaml-bench)
 else()
   if ( LLVM_INCLUDE_TESTS )

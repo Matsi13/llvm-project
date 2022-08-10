@@ -1167,7 +1167,7 @@ public:
       return QualType(T, 0);
 
     return Ctx.getSubstTemplateTypeParmType(T->getReplacedParameter(),
-                                            replacementType);
+                                            replacementType, T->getPackIndex());
   }
 
   // FIXME: Non-trivial to implement, but important for C++
@@ -3186,6 +3186,7 @@ StringRef FunctionType::getNameForCallConv(CallingConv CC) {
   case CC_AAPCS_VFP: return "aapcs-vfp";
   case CC_AArch64VectorCall: return "aarch64_vector_pcs";
   case CC_AArch64SVEPCS: return "aarch64_sve_pcs";
+  case CC_AMDGPUKernelCall: return "amdgpu_kernel";
   case CC_IntelOclBicc: return "intel_ocl_bicc";
   case CC_SpirFunction: return "spir_function";
   case CC_OpenCLKernel: return "opencl_kernel";
@@ -3212,11 +3213,14 @@ FunctionProtoType::FunctionProtoType(QualType result, ArrayRef<QualType> params,
   FunctionTypeBits.Variadic = epi.Variadic;
   FunctionTypeBits.HasTrailingReturn = epi.HasTrailingReturn;
 
-  // Fill in the extra trailing bitfields if present.
-  if (hasExtraBitfields(epi.ExceptionSpec.Type)) {
+  if (epi.requiresFunctionProtoTypeExtraBitfields()) {
+    FunctionTypeBits.HasExtraBitfields = true;
     auto &ExtraBits = *getTrailingObjects<FunctionTypeExtraBitfields>();
-    ExtraBits.NumExceptionType = epi.ExceptionSpec.Exceptions.size();
+    ExtraBits = FunctionTypeExtraBitfields();
+  } else {
+    FunctionTypeBits.HasExtraBitfields = false;
   }
+
 
   // Fill in the trailing argument array.
   auto *argSlot = getTrailingObjects<QualType>();
@@ -3228,6 +3232,9 @@ FunctionProtoType::FunctionProtoType(QualType result, ArrayRef<QualType> params,
 
   // Fill in the exception type array if present.
   if (getExceptionSpecType() == EST_Dynamic) {
+    auto &ExtraBits = *getTrailingObjects<FunctionTypeExtraBitfields>();
+    ExtraBits.NumExceptionType = epi.ExceptionSpec.Exceptions.size();
+
     assert(hasExtraBitfields() && "missing trailing extra bitfields!");
     auto *exnSlot =
         reinterpret_cast<QualType *>(getTrailingObjects<ExceptionType>());
@@ -3622,6 +3629,7 @@ bool AttributedType::isCallingConv() const {
   case attr::VectorCall:
   case attr::AArch64VectorPcs:
   case attr::AArch64SVEPcs:
+  case attr::AMDGPUKernelCall:
   case attr::Pascal:
   case attr::MSABI:
   case attr::SysVABI:
@@ -4312,20 +4320,13 @@ bool Type::isObjCARCImplicitlyUnretainedType() const {
 }
 
 bool Type::isObjCNSObjectType() const {
-  const Type *cur = this;
-  while (true) {
-    if (const auto *typedefType = dyn_cast<TypedefType>(cur))
-      return typedefType->getDecl()->hasAttr<ObjCNSObjectAttr>();
-
-    // Single-step desugar until we run out of sugar.
-    QualType next = cur->getLocallyUnqualifiedSingleStepDesugaredType();
-    if (next.getTypePtr() == cur) return false;
-    cur = next.getTypePtr();
-  }
+  if (const auto *typedefType = getAs<TypedefType>())
+    return typedefType->getDecl()->hasAttr<ObjCNSObjectAttr>();
+  return false;
 }
 
 bool Type::isObjCIndependentClassType() const {
-  if (const auto *typedefType = dyn_cast<TypedefType>(this))
+  if (const auto *typedefType = getAs<TypedefType>())
     return typedefType->getDecl()->hasAttr<ObjCIndependentClassAttr>();
   return false;
 }
