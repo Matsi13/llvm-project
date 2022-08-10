@@ -9,7 +9,7 @@
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
-#include "mlir/Dialect/GPU/GPUDialect.h"
+
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 
 

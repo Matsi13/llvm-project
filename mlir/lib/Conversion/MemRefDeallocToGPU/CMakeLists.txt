@@ -13,10 +13,11 @@ add_mlir_conversion_library(MemRefDeallocToGPU
   LINK_LIBS PUBLIC
   MLIRAnalysis
   MLIRDataLayoutInterfaces
-  MLIRMemRef
+  MLIRMemRefDialect
   MLIRTransforms
-  MLIRArithmetic
+  #MLIRArithmetic
   MLIRGPUOps
+  MLIRGPUTransforms
   MLIRPass
   MLIRSupport
   MLIRIR

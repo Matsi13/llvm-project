@@ -13,7 +13,7 @@ add_mlir_conversion_library(MemRefAllocaToAlloc
   LINK_LIBS PUBLIC
   MLIRAnalysis
   MLIRDataLayoutInterfaces
-  MLIRMemRef
+  MLIRMemRefDialect
   MLIRTransforms
   MLIRPass
   MLIRSupport

@@ -9,9 +9,9 @@
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
-#include "mlir/Dialect/GPU/GPUDialect.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/SCF.h"
+//#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
@@ -41,11 +41,11 @@ class MemRefDeallocToGPUPattern
                                 PatternRewriter &rewriter) const override {
     memref::DeallocOpAdaptor operandAdaptor = memref::DeallocOpAdaptor(op);
     Operation* baseop(op);
-    auto deallocOp = cast<memref::DeallocOp>(op);
+    //auto deallocOp = cast<memref::DeallocOp>(op);
     // auto launchOp = op.getParentOfType<gpu::LaunchOp>();
     if (!baseop->getParentOfType<gpu::LaunchOp>())
     {
-       ValueRange voidValue = {};
+       //ValueRange voidValue = {};
        rewriter.replaceOpWithNewOp<gpu::DeallocOp>(op, Type(), ValueRange(),operandAdaptor.memref());
     }
     return success();
