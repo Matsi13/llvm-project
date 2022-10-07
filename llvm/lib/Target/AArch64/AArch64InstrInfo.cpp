@@ -1093,6 +1093,9 @@ bool AArch64InstrInfo::isSchedulingBoundary(const MachineInstr &MI,
   case AArch64::ISB:
     // DSB and ISB also are scheduling barriers.
     return true;
+  case AArch64::MSRpstatesvcrImm1:
+    // SMSTART and SMSTOP are also scheduling barriers.
+    return true;
   default:;
   }
   if (isSEHInstruction(MI))
@@ -4331,8 +4334,6 @@ static void emitFrameOffsetAdj(MachineBasicBlock &MBB,
       int Imm = (int)(ThisVal << LocalShiftSize);
       if ((DestReg == AArch64::FP && SrcReg == AArch64::SP) ||
           (SrcReg == AArch64::FP && DestReg == AArch64::SP)) {
-        if (HasWinCFI)
-          *HasWinCFI = true;
         if (Imm == 0)
           BuildMI(MBB, MBBI, DL, TII->get(AArch64::SEH_SetFP)).setMIFlag(Flag);
         else
@@ -4342,11 +4343,12 @@ static void emitFrameOffsetAdj(MachineBasicBlock &MBB,
         assert(Offset == 0 && "Expected remaining offset to be zero to "
                               "emit a single SEH directive");
       } else if (DestReg == AArch64::SP) {
-        if (HasWinCFI)
-          *HasWinCFI = true;
         assert(SrcReg == AArch64::SP && "Unexpected SrcReg for SEH_StackAlloc");
         BuildMI(MBB, MBBI, DL, TII->get(AArch64::SEH_StackAlloc))
             .addImm(Imm)
+            .setMIFlag(Flag);
+      } else {
+        BuildMI(MBB, MBBI, DL, TII->get(AArch64::SEH_Nop))
             .setMIFlag(Flag);
       }
       if (HasWinCFI)
@@ -4909,7 +4911,9 @@ bool AArch64InstrInfo::isAssociativeAndCommutative(
   case AArch64::FMULv2f32:
   case AArch64::FMULv2f64:
   case AArch64::FMULv4f32:
-    return Inst.getParent()->getParent()->getTarget().Options.UnsafeFPMath;
+    return Inst.getParent()->getParent()->getTarget().Options.UnsafeFPMath ||
+           (Inst.getFlag(MachineInstr::MIFlag::FmReassoc) &&
+            Inst.getFlag(MachineInstr::MIFlag::FmNsz));
   default:
     return false;
   }

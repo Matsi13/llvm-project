@@ -373,28 +373,6 @@ LocalAddressSpace::getEncodedP(pint_t &addr, pint_t end, uint8_t encoding,
   typedef ElfW(Addr) Elf_Addr;
 #endif
 
-static Elf_Addr calculateImageBase(struct dl_phdr_info *pinfo) {
-  Elf_Addr image_base = pinfo->dlpi_addr;
-#if defined(__ANDROID__) && __ANDROID_API__ < 18
-  if (image_base == 0) {
-    // Normally, an image base of 0 indicates a non-PIE executable. On
-    // versions of Android prior to API 18, the dynamic linker reported a
-    // dlpi_addr of 0 for PIE executables. Compute the true image base
-    // using the PT_PHDR segment.
-    // See https://github.com/android/ndk/issues/505.
-    for (Elf_Half i = 0; i < pinfo->dlpi_phnum; i++) {
-      const Elf_Phdr *phdr = &pinfo->dlpi_phdr[i];
-      if (phdr->p_type == PT_PHDR) {
-        image_base = reinterpret_cast<Elf_Addr>(pinfo->dlpi_phdr) -
-          phdr->p_vaddr;
-        break;
-      }
-    }
-  }
-#endif
-  return image_base;
-}
-
 struct _LIBUNWIND_HIDDEN dl_iterate_cb_data {
   LocalAddressSpace *addressSpace;
   UnwindInfoSections *sects;
@@ -468,7 +446,7 @@ static int findUnwindSectionsByPhdr(struct dl_phdr_info *pinfo,
   (void)pinfo_size;
 #endif
 
-  Elf_Addr image_base = calculateImageBase(pinfo);
+  Elf_Addr image_base = pinfo->dlpi_addr;
 
   // Most shared objects seen in this callback function likely don't contain the
   // target address, so optimize for that. Scan for a matching PT_LOAD segment
@@ -606,11 +584,6 @@ inline bool LocalAddressSpace::findUnwindSections(pint_t targetAddr,
   // support for _dl_find_object on other unwind formats is not implemented,
   // yet.
 #if defined(DLFO_STRUCT_HAS_EH_DBASE) & defined(_LIBUNWIND_SUPPORT_DWARF_INDEX)
-  // We expect to run on a platform which does not use a base address for
-  // exception information.
-#if DLFO_STRUCT_HAS_EH_DBASE
-#error dlfo_eh_dbase is not supported for DWARF-based unwinding
-#endif
   // We expect `_dl_find_object` to return PT_GNU_EH_FRAME.
 #if DLFO_EH_SEGMENT_TYPE != PT_GNU_EH_FRAME
 #error _dl_find_object retrieves an unexpected section type

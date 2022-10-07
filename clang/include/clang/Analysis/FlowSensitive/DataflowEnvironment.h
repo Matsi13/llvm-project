@@ -135,14 +135,13 @@ public:
   ///
   /// Requirements:
   ///
-  ///  The callee of `Call` must be a `FunctionDecl` with a body.
+  ///  The callee of `Call` must be a `FunctionDecl`.
   ///
   ///  The body of the callee must not reference globals.
   ///
   ///  The arguments of `Call` must map 1:1 to the callee's parameters.
-  ///
-  ///  Each argument of `Call` must already have a `StorageLocation`.
   Environment pushCall(const CallExpr *Call) const;
+  Environment pushCall(const CXXConstructExpr *Call) const;
 
   /// Moves gathered information back into `this` from a `CalleeEnv` created via
   /// `pushCall`.
@@ -261,7 +260,7 @@ public:
   ///
   ///  `Loc` must not be null.
   template <typename T>
-  typename std::enable_if<std::is_base_of<StorageLocation, T>::value, T &>::type
+  std::enable_if_t<std::is_base_of<StorageLocation, T>::value, T &>
   takeOwnership(std::unique_ptr<T> Loc) {
     return DACtx->takeOwnership(std::move(Loc));
   }
@@ -273,7 +272,7 @@ public:
   ///
   ///  `Val` must not be null.
   template <typename T>
-  typename std::enable_if<std::is_base_of<Value, T>::value, T &>::type
+  std::enable_if_t<std::is_base_of<Value, T>::value, T &>
   takeOwnership(std::unique_ptr<T> Val) {
     return DACtx->takeOwnership(std::move(Val));
   }
@@ -349,10 +348,12 @@ public:
 
   /// Returns the `DeclContext` of the block being analysed, if any. Otherwise,
   /// returns null.
-  const DeclContext *getDeclCtx() { return DeclCtx; }
+  const DeclContext *getDeclCtx() const { return CallStack.back(); }
 
-  /// Sets the `DeclContext` of the block being analysed.
-  void setDeclCtx(const DeclContext *Ctx) { DeclCtx = Ctx; }
+  /// Returns whether this `Environment` can be extended to analyze the given
+  /// `Callee` (i.e. if `pushCall` can be used), with recursion disallowed and a
+  /// given `MaxDepth`.
+  bool canDescend(unsigned MaxDepth, const DeclContext *Callee) const;
 
   /// Returns the `ControlFlowContext` registered for `F`, if any. Otherwise,
   /// returns null.
@@ -381,11 +382,17 @@ private:
   StorageLocation &skip(StorageLocation &Loc, SkipPast SP) const;
   const StorageLocation &skip(const StorageLocation &Loc, SkipPast SP) const;
 
+  /// Shared implementation of `pushCall` overloads. Note that unlike
+  /// `pushCall`, this member is invoked on the environment of the callee, not
+  /// of the caller.
+  void pushCallInternal(const FunctionDecl *FuncDecl,
+                        ArrayRef<const Expr *> Args);
+
   // `DACtx` is not null and not owned by this object.
   DataflowAnalysisContext *DACtx;
 
   // `DeclContext` of the block being analysed if provided.
-  const DeclContext *DeclCtx;
+  std::vector<const DeclContext *> CallStack;
 
   // In a properly initialized `Environment`, `ReturnLoc` should only be null if
   // its `DeclContext` could not be cast to a `FunctionDecl`.

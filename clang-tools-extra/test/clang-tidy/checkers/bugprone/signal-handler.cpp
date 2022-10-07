@@ -1,4 +1,4 @@
-// RUN: %check_clang_tidy -std=c++14 %s bugprone-signal-handler %t -- -- -isystem %clang_tidy_headers -isystem %S/Inputs/signal-handler
+// RUN: %check_clang_tidy -std=c++14 %s bugprone-signal-handler %t -- -- -isystem %clang_tidy_headers -isystem %S/Inputs/signal-handler -target x86_64-unknown-unknown
 
 #include "stdcpp.h"
 #include "stdio.h"

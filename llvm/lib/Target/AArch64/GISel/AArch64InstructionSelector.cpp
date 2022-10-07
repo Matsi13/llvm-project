@@ -2341,10 +2341,10 @@ bool AArch64InstructionSelector::earlySelect(MachineInstr &I) {
   }
   case TargetOpcode::G_FENCE: {
     if (I.getOperand(1).getImm() == 0)
-      BuildMI(MBB, I, I.getDebugLoc(), TII.get(AArch64::CompilerBarrier))
+      BuildMI(MBB, I, MIMetadata(I), TII.get(AArch64::CompilerBarrier))
           .addImm(I.getOperand(0).getImm());
     else
-      BuildMI(MBB, I, I.getDebugLoc(), TII.get(AArch64::DMB))
+      BuildMI(MBB, I, MIMetadata(I), TII.get(AArch64::DMB))
           .addImm(I.getOperand(0).getImm() == 4 ? 0x9 : 0xb);
     I.eraseFromParent();
     return true;
@@ -2679,8 +2679,12 @@ bool AArch64InstructionSelector::select(MachineInstr &I) {
       assert(SrcRB.getID() == DstRB.getID() && "Wrong extract regbank!");
 
       if (SrcRB.getID() == AArch64::GPRRegBankID) {
-        MIB.buildInstr(TargetOpcode::COPY, {DstReg}, {})
-            .addUse(SrcReg, 0, Offset == 0 ? AArch64::sube64 : AArch64::subo64);
+        auto NewI =
+            MIB.buildInstr(TargetOpcode::COPY, {DstReg}, {})
+                .addUse(SrcReg, 0,
+                        Offset == 0 ? AArch64::sube64 : AArch64::subo64);
+        constrainOperandRegClass(MF, TRI, MRI, TII, RBI, *NewI,
+                                 AArch64::GPR64RegClass, NewI->getOperand(0));
         I.eraseFromParent();
         return true;
       }
@@ -4882,7 +4886,7 @@ MachineInstr *AArch64InstructionSelector::emitConditionalComparison(
   unsigned NZCV = AArch64CC::getNZCVToSatisfyCondCode(InvOutCC);
   auto CCmp =
       MIB.buildInstr(CCmpOpc, {}, {LHS});
-  if (C)
+  if (CCmpOpc == AArch64::CCMPWi || CCmpOpc == AArch64::CCMPXi)
     CCmp.addImm(C->Value.getZExtValue());
   else
     CCmp.addReg(RHS);
