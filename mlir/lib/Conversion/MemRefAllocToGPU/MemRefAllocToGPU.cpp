@@ -1,17 +1,21 @@
 #include <type_traits>
 
-#include "../PassDetail.h"
+//#include "../PassDetail.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Analysis/DataLayoutAnalysis.h"
 #include "mlir/Conversion/MemRefAllocToGPU/MemRefAllocToGPU.h"
 
 #include "mlir/IR/AffineMap.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/IntegerSet.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "llvm/ADT/SmallBitVector.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+//#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 //#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Builders.h"
@@ -28,7 +32,10 @@
 #include "llvm/ADT/Sequence.h"
 #include "llvm/Support/Debug.h"
 
-
+namespace mlir {
+#define GEN_PASS_DEF_CONVERTMEMREFALLOCTOGPU
+#include "mlir/Conversion/Passes.h.inc"
+} // namespace mlir
 
 using namespace mlir;
 
@@ -47,7 +54,7 @@ class MemRefAllocToGPUPattern
     if (!baseop->getParentOfType<gpu::LaunchOp>())
     {
        ValueRange voidValue = {};
-       rewriter.replaceOpWithNewOp<gpu::AllocOp>(op,allocOp.memref().getType(), Type(),voidValue,operandAdaptor.dynamicSizes(),operandAdaptor.symbolOperands());
+       rewriter.replaceOpWithNewOp<gpu::AllocOp>(op,allocOp.getMemref().getType(), Type(),voidValue,operandAdaptor.getDynamicSizes(),operandAdaptor.getSymbolOperands());
     }
     return success();
   }
@@ -61,7 +68,7 @@ void mlir::populateMemRefAllocToGPUConversionPatterns(RewritePatternSet &pattern
 namespace {
 
 class ConvertMemRefAllocToGPUPass
-    : public ConvertMemRefAllocToGPUBase<ConvertMemRefAllocToGPUPass> {
+    : public impl::ConvertMemRefAllocToGPUBase<ConvertMemRefAllocToGPUPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     populateMemRefAllocToGPUConversionPatterns(patterns);
@@ -76,7 +83,7 @@ class ConvertMemRefAllocToGPUPass
           func::ReturnOp returnOpBase = cast<func::ReturnOp>(returnOp);
           func::ReturnOpAdaptor returnOpAdaptor(returnOpBase);
           for (auto result : returnOpAdaptor.getOperands()){
-              if (result == allocOp.memref()) {
+              if (result == allocOp.getMemref()) {
                 legal = true; break;
               }
           }
